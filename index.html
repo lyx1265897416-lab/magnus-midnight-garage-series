@@ -1,0 +1,393 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Midnight Garage Series</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Figtree:wght@400;500;600&family=Noto+Sans+SC:wght@400;500&display=swap">
+<style>
+[hidden]{display:none!important}
+/* One 9:16 screen, letterboxed on wide displays; all UI floats on the film. Single dark look on purpose: a night drama, gold = his eyes. */
+:root{
+  --night:#07090c; --ink:#f4efe4; --concrete:#c9cdd2; --mute:#8a9099;
+  --gold:#e7b350; --gold-deep:#a8792a; --glass:rgba(10,12,16,.64); --line:rgba(231,179,80,.38);
+  --display:"Marcellus",Georgia,serif; --body:"Figtree","Helvetica Neue",Arial,"Noto Sans SC","PingFang SC",sans-serif; --zh:"Noto Sans SC","PingFang SC","Hiragino Sans GB",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--night);color:var(--concrete);font-family:var(--body);overflow:hidden}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+#stage{position:relative;height:100%;max-width:calc(100dvh * 9 / 16);margin:0 auto;overflow:hidden;background:#000 center/cover no-repeat;isolation:isolate}
+video.v{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s linear;background:transparent}
+video.v.on{opacity:1}
+.shade{position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 16%,transparent 56%,rgba(0,0,0,.75));transition:background .3s}
+body.choosing .shade{background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 16%,transparent 30%,rgba(0,0,0,.92))}
+#top{position:absolute;left:0;right:0;top:0;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.brand{font-family:var(--display);letter-spacing:.16em;font-size:13px;text-transform:uppercase;color:var(--concrete);display:flex;gap:10px;align-items:baseline;min-width:0}
+.brand b{color:var(--gold);font-weight:400}
+.brand span{font-family:var(--zh);letter-spacing:.06em;font-size:12px;color:var(--mute);white-space:nowrap;text-transform:none}
+.icon{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);display:grid;place-items:center;cursor:pointer;flex:none}
+.icon svg{width:18px;height:18px;display:block}
+.icon:focus-visible,.opt:focus-visible,.cta:focus-visible,#say button:focus-visible,.ep:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* subtitles */
+#subs{position:absolute;left:0;right:0;z-index:4;bottom:calc(66px + env(safe-area-inset-bottom,0px));padding:0 max(20px,env(safe-area-inset-left,0px));text-align:center;pointer-events:none;display:flex;flex-direction:column;gap:3px}
+#subs .en{font-size:16px;line-height:1.35;color:#fff;font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.6);text-wrap:balance}
+#subs .zh{font-family:var(--zh);font-size:14px;color:#ece6d8;text-shadow:0 1px 3px rgba(0,0,0,.95)}
+#subs .who{font-size:10px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
+#subs.her .en,#subs.her .zh{color:var(--gold)}
+#subs.vo .en{font-style:italic;color:#dfe8ff}
+#card{position:absolute;inset:0;z-index:4;padding:0 max(28px,env(safe-area-inset-left,0px)) 0 max(28px,env(safe-area-inset-right,0px));text-align:center;pointer-events:none;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px}
+#card[hidden]{display:none!important}
+#card .zh,#card .en{max-width:32ch;text-wrap:balance}
+#card .zh{font-family:var(--zh);font-size:19px;line-height:1.55;color:#fff;letter-spacing:.06em;text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:pre-line}
+#card .en{font-family:var(--display);font-size:14px;letter-spacing:.06em;color:#e6dcc5;text-shadow:0 2px 6px rgba(0,0,0,.9)}
+/* progress */
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:12px}
+#track{flex:1;height:34px;display:flex;align-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
+#track i{display:block;height:2px;width:100%;background:rgba(255,255,255,.22);position:relative;border-radius:2px}
+#track i b{position:absolute;left:0;top:0;bottom:0;background:var(--gold);width:0;border-radius:2px}
+#track i s{position:absolute;top:50%;left:0;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(231,179,80,.25);transition:transform .12s}
+#track.drag i{height:4px}#track.drag i s{transform:scale(1.35)}
+#track:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+#chap{font-size:12px;color:var(--mute);white-space:nowrap;font-family:var(--zh)}
+body.choosing #bar,body.carding #bar,body.start #bar,body.ended #bar{display:none}
+#paused{position:absolute;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none}
+#paused div{width:66px;height:66px;border-radius:50%;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center}
+/* choice sheet */
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:7;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px;transform:translateY(12px);opacity:0;transition:opacity .35s ease,transform .35s ease;pointer-events:none}
+#sheet.show{opacity:1;transform:none;pointer-events:auto}
+.cue{font-size:12.5px;color:var(--mute);text-align:center;font-family:var(--zh);line-height:1.5}
+.cue .zh,.cue .en{display:block;font-family:var(--body);font-style:italic;font-size:11.5px;margin-top:1px}
+.opt{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3px;min-height:56px;padding:11px 16px;border-radius:14px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);cursor:pointer;transition:border-color .2s,transform .12s}
+.opt:hover{border-color:var(--gold)}
+.opt:active{transform:scale(.985)}
+.opt .zh{font-family:var(--zh);font-size:15px;color:var(--ink);line-height:1.35}
+.opt .en{font-size:12px;color:#c7bea9}
+.opt.hint{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(231,179,80,.28)}
+#say{display:flex;gap:8px;align-items:center;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.5);padding:5px 5px 5px 14px}
+#say input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#fff;font:inherit;font-size:15px;padding:8px 0}
+#say input::placeholder{color:#8f949c}
+#say button{width:40px;height:40px;border-radius:10px;border:0;background:var(--gold);color:#1a1206;display:grid;place-items:center;cursor:pointer;flex:none}
+#say button:disabled{background:#3a3d42;color:#777}
+#say button svg{width:18px;height:18px}
+/* full cards */
+.card{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:flex-end;gap:16px;padding:calc(40px + env(safe-area-inset-top,0px)) max(22px,env(safe-area-inset-right,0px)) calc(30px + env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-left,0px));background:linear-gradient(to bottom,rgba(4,5,7,.1),rgba(4,5,7,.25) 35%,rgba(4,5,7,.93) 74%)}
+.kicker{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold)}
+.card h1{font-family:var(--display);font-weight:400;font-size:clamp(32px,9.5vw,44px);line-height:1.05;margin:0;color:#f6f1e6;text-wrap:balance}
+.card h1 em{font-style:normal;color:var(--gold)}
+.card h2{font-family:var(--zh);font-weight:500;font-size:22px;margin:0;color:#f6f1e6;letter-spacing:.08em}
+.card p{margin:0;font-size:14.5px;line-height:1.55;color:#d4d7dc;max-width:34ch;font-family:var(--zh)}
+.card p.en{font-family:var(--body);font-size:13px;color:#a9aeb6;margin-top:-8px}
+.cta{align-self:stretch;min-height:54px;border-radius:14px;border:0;background:var(--gold);color:#1b1307;font-weight:600;font-size:16px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--zh)}
+.cta.ghost{background:transparent;border:1px solid rgba(255,255,255,.25);color:#e8e8e8;font-weight:500;font-size:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute);font-family:var(--zh)}
+.meta > span::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold-deep);margin-right:7px;vertical-align:middle}
+#startCard{background:linear-gradient(to bottom,rgba(4,5,7,.35),transparent 14%,transparent 44%,rgba(4,5,7,.82) 60%,rgba(4,5,7,.97) 78%)}
+#startCard h1{font-size:clamp(36px,11vw,48px);line-height:1.02}
+#epCard{justify-content:center;align-items:center;text-align:center;background:rgba(4,5,7,.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#epCard .num{font-family:var(--display);font-size:13px;letter-spacing:.4em;color:var(--gold)}
+#epCard .t{font-family:var(--zh);font-size:30px;color:#fff;letter-spacing:.14em}
+#epCard .te{font-family:var(--display);font-size:15px;letter-spacing:.12em;color:#cfc6b4}
+#epCard .done{font-family:var(--zh);font-size:13px;color:var(--mute)}
+#epCard .cta{align-self:center;width:min(280px,100%);margin-top:10px}
+.path{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px;color:#cfd2d7;font-family:var(--zh);max-height:30vh;overflow:auto}
+.path li{display:flex;gap:10px;align-items:baseline}
+.path li b{font-weight:500;color:var(--gold);font-size:11px;letter-spacing:.1em;min-width:26px;font-family:var(--body)}
+/* menu */
+#menu{position:absolute;z-index:9;top:calc(58px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:min(260px,calc(100% - 32px));background:rgba(14,16,20,.97);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:6px;display:flex;flex-direction:column;max-height:70vh;overflow:auto}
+#menu button{background:none;border:0;text-align:center;padding:10px 12px;border-radius:9px;font-size:14px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:10px;min-height:44px;width:100%;font-family:var(--zh)}
+#menu button:hover{background:rgba(255,255,255,.06)}
+#menu button small{color:var(--mute)}
+#menu .sep{height:1px;background:rgba(255,255,255,.08);margin:4px 8px}
+#menu .lab{text-align:center;font-size:11px;letter-spacing:.2em;color:var(--mute);padding:8px 12px 4px;text-transform:uppercase}
+.ep b{color:var(--gold);font-weight:500;font-family:var(--display);margin-right:8px}
+#menu .ep.locked{opacity:.38;cursor:not-allowed}#menu .ep.locked:hover{background:none}
+#menu .ep small svg{display:block}
+#menu .hint{text-align:center;font-size:11.5px;color:var(--mute);padding:0 12px 6px;font-family:var(--zh);line-height:1.4}
+#toast{position:absolute;z-index:10;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.14);padding:8px 14px;border-radius:999px;font-size:12.5px;white-space:nowrap;font-family:var(--zh)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+body.en-only .zh,body.en-only .only-zh{display:none!important}
+body:not(.en-only) .only-en{display:none!important}
+body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!important}
+#speedWrap{position:relative;flex:none}
+#speedBtn{height:30px;min-width:46px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.35);color:var(--concrete);font-size:12px;font-variant-numeric:tabular-nums;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#speedBtn:focus-visible,#speedMenu button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#speedMenu{position:absolute;right:0;bottom:40px;background:rgba(14,16,20,.97);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:4px;display:flex;flex-direction:column;min-width:76px;z-index:9}
+#speedMenu button{background:none;border:0;border-radius:8px;min-height:36px;padding:0 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+#speedMenu button:hover{background:rgba(255,255,255,.06)}
+#speedMenu button.on{color:var(--gold)}
+</style>
+
+<div id="stage">
+  <video class="v" id="va" playsinline webkit-playsinline preload="auto"></video>
+  <video class="v" id="vb" playsinline webkit-playsinline preload="auto"></video>
+  <div class="shade"></div>
+  <div id="paused" hidden><div><svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M8 5.5v13l10.5-6.5z"/></svg></div></div>
+  <header id="top">
+    <div class="brand"><b>Magnus</b><span id="epName">Midnight Garage</span></div>
+    <button class="icon" id="menuBtn" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+  </header>
+  <nav id="menu" hidden>
+    <div class="lab"><span class="only-zh">选集</span><span class="only-en">Episodes</span></div>
+    <div class="hint" id="epHint"></div>
+    <div id="epList"></div>
+    <div class="sep"></div>
+    <button id="mSub" hidden><span>字幕</span><small id="mSubV"></small></button>
+    <button id="mBack"><span><span class="only-zh">返回上一个选择</span><span class="only-en">Back to last choice</span></span></button>
+    <button id="mRestart"><span><span class="only-zh">从头开始</span><span class="only-en">Start over</span></span></button>
+  </nav>
+  <div id="card" hidden></div>
+  <div id="subs" aria-live="polite"></div>
+  <div id="bar">
+    <button class="icon" id="playBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="#eee" id="playIco"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+    <div id="track" role="slider" tabindex="0" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="fill"></b><s id="knob"></s></i></div>
+    <div id="chap"></div>
+    <div id="speedWrap"><button id="speedBtn" aria-label="Playback speed" aria-expanded="false">1.0x</button><div id="speedMenu" hidden></div></div>
+  </div>
+  <section id="sheet" aria-label="Your choice">
+    <div class="cue" id="cue"></div>
+    <button class="opt" id="optA"></button>
+    <button class="opt" id="optB"></button>
+    <form id="say" autocomplete="off">
+      <input id="sayIn" maxlength="80" placeholder="或者，用你自己的话对他说…" aria-label="Say something to Magnus">
+      <button id="sayBtn" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+    </form>
+  </section>
+
+  <section class="card" id="startCard">
+    <div class="kicker">Interactive Series<span class="zh"> · 互动短剧</span></div>
+    <h1>He gets engaged in <em>ten minutes.</em></h1>
+    <p class="only-zh">今晚的酒店车库，他闻到你的气味，眼睛变成了金色。每一个选择，都由你来做。</p>
+    <p class="only-en">Tonight, in the hotel garage, a stranger's eyes turn gold the moment he catches your scent. Every choice is yours.</p>
+    <div class="meta"><span><span class="only-zh">7 集</span><span class="only-en">7 episodes</span></span><span><span class="only-zh">8 个选择</span><span class="only-en">8 choices</span></span><span><span class="only-zh">约 9 分钟</span><span class="only-en">≈9 min</span></span><span><span class="only-zh">请打开声音</span><span class="only-en">Sound on</span></span></div>
+    <button class="cta" id="startBtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg><span class="only-zh">开始观看</span><span class="only-en">Watch</span></button>
+    <button class="cta ghost" id="skipTrailer"><span class="only-zh">跳过预告，从第 1 集开始</span><span class="only-en">Skip trailer, start Episode 1</span></button>
+  </section>
+
+  <section class="card" id="epCard" hidden>
+    <div class="done" id="epDone"></div>
+    <div class="num" id="epNum"></div>
+    <div class="t" id="epT"></div>
+    <div class="te" id="epTe"></div>
+    <button class="cta" id="epGo"><span class="only-zh">继续观看</span><span class="only-en">Continue</span></button>
+  </section>
+
+  <section class="card" id="endCard" hidden>
+    <div class="kicker"><span class="only-zh">第一季 · 完</span><span class="only-en">End of Season 1</span></div>
+    <h1>To be <em>continued</em></h1>
+    <p class="only-zh">长老会已经宣战。他选了你，代价是他自己的血脉。</p>
+    <p class="en">He chose you. The Council has declared war on his blood.</p>
+    <ul class="path" id="endPath"></ul>
+    <div class="row">
+      <button class="cta ghost" id="endBack"><span class="only-zh">换个选择</span><span class="only-en">Change a choice</span></button>
+      <button class="cta ghost" id="endEps"><span class="only-zh">选集</span><span class="only-en">Episodes</span></button>
+    </div>
+    <button class="cta" id="endRestart"><span class="only-zh">从头再看</span><span class="only-en">Watch again</span></button>
+  </section>
+  <div id="toast" hidden></div>
+</div>
+
+<script src="data.js" charset="utf-8"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const {CLIPS, EPS, NODES, POINTS} = window.DRAMA;
+const va = $('va'), vb = $('vb'); let front = va, back = vb;
+const wait = new Audio('audio/wait.mp3'); wait.loop = true; wait.volume = 0;
+const voice = new Audio();
+let st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0};
+// 字幕跟随系统语言：英文系统只显示英文，中文系统中英双语
+const HL = location.hash.slice(1);  // 预览用：链接末尾加 #zh 或 #en 可强制语言
+const EN = HL === 'en' ? true : HL === 'zh' ? false : !/^zh/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
+const T = (zh, en) => EN ? en : zh;
+// 中文系统：默认中英双语，可在菜单切换为仅英文；英文系统：只有英文
+let subEn = EN; if (!EN) { try { subEn = localStorage.getItem('mg2-sub') === 'en'; } catch(e){} }
+function applyLang(){ document.body.classList.toggle('en-only', EN); document.body.classList.toggle('sub-en', subEn); document.documentElement.lang = EN ? 'en' : 'zh';
+  const b = $('mSub'); if (b){ b.hidden = EN; $('mSubV').textContent = subEn ? '仅英文' : '中英双语'; } }
+$('sayIn').placeholder = T('或者，用你自己的话对他说…', 'Or say it your way…');
+applyLang();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mode(m){ document.body.className = document.body.className.replace(/\b(start|choosing|playing|carding|ended)\b/g,'').trim() + ' ' + m; applyLang(); }
+mode('start');
+$('stage').style.backgroundImage = 'url(media/cover.jpg)';
+
+// wait music fade
+let waitTarget = 0;
+setInterval(() => { const d = waitTarget - wait.volume; if (Math.abs(d) > .01) wait.volume = Math.max(0, Math.min(1, wait.volume + Math.sign(d) * .02)); else if (waitTarget === 0 && !wait.paused && wait.volume < .02) wait.pause(); }, 60);
+function waitMusic(on){ waitTarget = on ? .22 : 0; if (on && wait.paused) wait.play().catch(()=>{}); }
+
+// subtitles
+const subs = $('subs'), card = $('card');
+let lastKey = '', holdUntil = 0;
+function showSub(c){
+  if (!c){ subs.innerHTML = ''; subs.className = ''; return; }
+  subs.className = c.k === 'her' ? 'her' : c.k === 'vo' ? 'vo' : '';
+  const who = c.k === 'her' ? T('你', 'You') : c.who || '';
+  subs.innerHTML = (who ? `<div class="who">${esc(who)}</div>` : '') + (c.zh ? `<div class="zh">${esc(c.zh)}</div>` : '') + (c.en ? `<div class="en">${esc(c.en)}</div>` : '');
+}
+function showCard(c){ if (!c){ card.hidden = true; return; } card.hidden = false; card.innerHTML = `<div class="zh">${esc(c.zh)}</div><div class="en">${esc(c.en)}</div>`; }
+function tick(){
+  if (!st.clip || document.body.classList.contains('choosing') || performance.now() < holdUntil) return;
+  const t = front.currentTime, list = CLIPS[st.clip].cues || [];
+  let sub = null, cd = null;
+  for (const q of list){ if (t >= q.s && t <= q.e){ if (q.k === 'card') cd = cd || q; else sub = sub || q; } }
+  const key = st.clip + (sub ? sub.s : '') + '|' + (cd ? cd.s : '');
+  if (key !== lastKey){ lastKey = key; showSub(sub); showCard(cd); }
+}
+
+// playback
+const src = id => `media/${id}.mp4`;
+function swap(){ const f = front; front = back; back = f; front.classList.add('on'); back.classList.remove('on'); }
+const warmed = {}; const keep = [];
+function warm(ids){ ids.forEach(id => { if (!id || warmed[id] || !CLIPS[id]) return; warmed[id] = 1; const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.src = src(id); v.load(); keep.push(v); if (keep.length > 6) keep.shift(); }); }
+function playClip(id){
+  st.clip = id; lastKey = ''; showSub(null); showCard(null);
+  back.src = src(id); back.currentTime = 0; back.muted = false; back.defaultPlaybackRate = rate; back.playbackRate = rate;
+  const go = () => back.play().then(() => { swap(); front.onended = onEnd; setTimeout(() => back.pause(), 250); })
+    .catch(() => { swap(); front.onended = onEnd; $('paused').hidden = false; toast(T('点一下画面继续播放', 'Tap to keep playing')); });
+  if (back.readyState >= 2) go(); else back.addEventListener('loadeddata', go, {once:true});
+  $('chap').textContent = st.ep ? `EP${st.ep}` : T('预告', 'Trailer');
+  warm(CLIPS[id].next || []);
+}
+function onEnd(){ if (st.queue.length) return playClip(st.queue.shift()); const nx = st.after; st.after = null; go(nx); }
+function runSeq(seq, after){ if (!seq.length) return go(after); st.queue = seq.slice(1); st.after = after; mode('playing'); waitMusic(false); playClip(seq[0]); }
+
+function go(id){
+  const n = NODES[id]; if (!n) return;
+  st.node = id;
+  if (n.type === 'ep') return epIntro(n, id);
+  if (n.type === 'choice') return openChoice(id);
+  if (n.type === 'end') return showEnd();
+}
+function epIntro(n, id, prevDone){
+  const prev = st.ep; st.ep = n.ep; markReached(n.ep); $('epName').textContent = EN ? (n.ep ? `Episode ${n.ep}` : 'Trailer') : EPS[n.ep].label;
+  if (n.ep === 0) return runSeq(n.seq, n.next);
+  mode('carding'); showSub(null); showCard(null); front.pause();
+  $('epDone').textContent = prev && prev < n.ep ? T(`第 ${prev} 集 · 完`, `End of Episode ${prev}`) : '';
+  $('epNum').textContent = `EPISODE ${n.ep}`; $('epT').textContent = EN ? EPS[n.ep].en : `第 ${n.ep} 集 · ${EPS[n.ep].zh}`; $('epTe').textContent = EN ? '' : EPS[n.ep].en;
+  $('epCard').hidden = false; waitMusic(true);
+  warm(n.seq);
+  clearTimeout(epIntro.t); epIntro.t = setTimeout(() => $('epGo').click(), 3500);
+  $('epGo').onclick = () => { clearTimeout(epIntro.t); $('epCard').hidden = true; runSeq(n.seq, n.next); };
+}
+
+// choices
+function openChoice(id){
+  const p = POINTS[id];
+  st.checkpoint = {node:id, path: st.path.slice(), ep: st.ep};
+  mode('choosing'); waitMusic(true); showCard(null);
+  $('stage').style.backgroundImage = `url(media/${id}.jpg)`;
+  showSub({en: p.line[0], zh: p.line[1], who: 'Magnus'});
+  $('cue').innerHTML = `<span class="zh">${esc(p.cue[1])}</span><span class="en">${esc(p.cue[0])}</span>`;
+  const opt = (b, o) => { b.innerHTML = `<span class="zh">${esc(o[1])}</span><span class="en">${esc(o[0])}</span>`; b.classList.remove('hint'); };
+  opt($('optA'), p.A); opt($('optB'), p.B);
+  $('optA').onclick = () => choose(id, 'A'); $('optB').onclick = () => choose(id, 'B');
+  $('sayIn').value = ''; $('sayBtn').disabled = false;
+  setTimeout(() => { $('sheet').classList.add('show'); subs.style.bottom = ($('sheet').offsetHeight + 24) + 'px'; }, 150);
+  warm(NODES[id].A.seq.concat(NODES[id].B.seq));
+}
+function closeChoice(){ $('sheet').classList.remove('show'); subs.style.bottom = ''; voice.pause(); }
+let busy = false;
+function choose(id, k){
+  if (busy) return; busy = true; setTimeout(() => busy = false, 700);
+  const n = NODES[id][k], p = POINTS[id];
+  closeChoice(); st.path.push({id, k, zh: p[k][1], en: p[k][0]});
+  showSub({en: p[k][0], zh: p[k][1], k: 'her'}); holdUntil = performance.now() + 1200; lastKey = 'you';
+  if (n.ep){ setTimeout(() => epIntro({ep: n.ep, seq: n.seq, next: n.next}, null), 900); return; }
+  runSeq(n.seq, n.next);
+}
+
+// free input
+const norm = s => ' ' + s.toLowerCase().replace(/[’']/g, "'").replace(/[^\p{L}\p{N}' ]+/gu, ' ').replace(/\s+/g, ' ') + ' ';
+const hit = (t, kws) => kws.some(k => /[\u4e00-\u9fff]/.test(k) ? t.includes(k) : t.includes(' ' + k.toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, ' ').trim()));
+const fb = {};
+$('say').addEventListener('submit', e => {
+  e.preventDefault();
+  const raw = $('sayIn').value.trim(); const id = st.node, p = POINTS[id]; if (!raw || !p) return;
+  $('sayIn').value = ''; const t = norm(raw);
+  showSub(EN ? {en: raw, zh: '', k: 'her'} : {en: '', zh: raw, k: 'her'});
+  let r = p.replies.find(x => hit(t, x.kw)), sug = null;
+  for (const k of ['A', 'B']) if (hit(t, p.suggest[k])) { sug = k; break; }
+  if (!r && !sug){ const i = (fb[id] = (fb[id] || 0)) % p.fallback.length; fb[id]++; r = p.fallback[i]; }
+  $('sayBtn').disabled = true;
+  setTimeout(() => {
+    if (r){ showSub({en: r.en, zh: r.zh, who: 'Magnus'}); voice.src = `audio/${r.v}.mp3`; voice.play().catch(()=>{}); waitTarget = .1; voice.onended = () => waitMusic(true); }
+    $('optA').classList.toggle('hint', sug === 'A'); $('optB').classList.toggle('hint', sug === 'B');
+    if (sug && !r) showSub({en: 'Sounds like this one. Tap it.', zh: '像是这个选择，点一下就这么做。'});
+    $('sayBtn').disabled = false;
+  }, 420);
+});
+
+// end
+function showEnd(){
+  mode('ended'); waitMusic(true); showSub(null); showCard(null);
+  if (!finished){ finished = true; try { localStorage.setItem('mg2-finished', '1'); } catch(e){} renderEps(); }
+  $('endPath').innerHTML = st.path.map((p, i) => `<li><b>0${i + 1}</b><span>${esc(T(p.zh, p.en))}</span></li>`).join('');
+  $('endCard').hidden = false;
+}
+$('endRestart').onclick = () => { $('endCard').hidden = true; restart(true); };
+$('endBack').onclick = () => { $('endCard').hidden = true; back2choice(); };
+$('endEps').onclick = () => { $('endCard').hidden = true; openMenu(true); };
+function back2choice(){ const cp = st.checkpoint; if (!cp) return restart(true); st.path = cp.path.slice(); st.queue = []; st.after = null; st.ep = cp.ep; front.pause(); go(cp.node); }
+function restart(withTrailer){ st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0}; closeChoice(); hideCards(); go(withTrailer ? 'ep0' : 'ep1'); }
+function hideCards(){ ['startCard','epCard','endCard'].forEach(x => $(x).hidden = true); }
+
+// start
+$('startBtn').onclick = () => { hideCards(); go('ep0'); };
+$('skipTrailer').onclick = () => { hideCards(); go('ep1'); };
+
+// controls
+function togglePause(){ if (!document.body.classList.contains('playing')) return; if (front.paused){ front.play(); $('paused').hidden = true; } else { front.pause(); $('paused').hidden = false; } }
+$('stage').addEventListener('click', e => { if (e.target.closest('button,#sheet,#bar,#menu,.card,#top')) return; togglePause(); });
+$('playBtn').onclick = togglePause;
+[va, vb].forEach(v => { v.addEventListener('play', () => { if (v === front){ $('playIco').innerHTML = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; $('paused').hidden = true; } }); v.addEventListener('pause', () => { if (v === front && !v.ended) $('playIco').innerHTML = '<path d="M8 5.5v13l10.5-6.5z"/>'; }); });
+// progress: tap or drag to seek within the current clip
+let dragging = false, swallow = false;
+$('mSub').onclick = () => { subEn = !subEn; try { localStorage.setItem('mg2-sub', subEn ? 'en' : 'zh'); } catch(e){} applyLang(); lastKey = ''; };
+// playback speed
+const RATES = [0.75, 1, 1.25, 1.5, 2]; let rate = 1;
+try { const r = +localStorage.getItem('mg2-rate'); if (RATES.includes(r)) rate = r; } catch(e){}
+const fmtRate = r => (r % 1 ? String(r) : r.toFixed(1)) + 'x';
+function applyRate(){ [va, vb].forEach(v => { v.defaultPlaybackRate = rate; v.playbackRate = rate; }); $('speedBtn').textContent = fmtRate(rate); $('speedMenu').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.r === rate)); }
+$('speedMenu').innerHTML = RATES.slice().reverse().map(r => `<button data-r="${r}">${fmtRate(r)}</button>`).join('');
+function closeSpeed(){ $('speedMenu').hidden = true; $('speedBtn').setAttribute('aria-expanded', 'false'); }
+$('speedBtn').onclick = e => { e.stopPropagation(); const m = $('speedMenu'); m.hidden = !m.hidden; $('speedBtn').setAttribute('aria-expanded', String(!m.hidden)); };
+$('speedMenu').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); rate = +b.dataset.r; try { localStorage.setItem('mg2-rate', String(rate)); } catch(err){} applyRate(); closeSpeed(); });
+applyRate();
+const track = $('track');
+function setBar(p){ const pc = Math.max(0, Math.min(100, p * 100)); $('fill').style.width = pc + '%'; $('knob').style.left = pc + '%'; track.setAttribute('aria-valuenow', Math.round(pc)); }
+function seekTo(clientX){ const r = track.querySelector('i').getBoundingClientRect(); const p = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); setBar(p); if (front.duration) front.currentTime = Math.min(front.duration - 0.05, p * front.duration); lastKey = ''; }
+track.addEventListener('pointerdown', e => { if (!front.duration) return; dragging = true; track.classList.add('drag'); track.setPointerCapture(e.pointerId); seekTo(e.clientX); e.preventDefault(); });
+track.addEventListener('pointermove', e => { if (dragging) seekTo(e.clientX); });
+const endDrag = () => { if (!dragging) return; dragging = false; track.classList.remove('drag'); };
+track.addEventListener('pointerup', endDrag); track.addEventListener('pointercancel', endDrag);
+track.addEventListener('keydown', e => { if (!front.duration) return; if (e.key === 'ArrowRight') front.currentTime = Math.min(front.duration - 0.05, front.currentTime + 3); if (e.key === 'ArrowLeft') front.currentTime = Math.max(0, front.currentTime - 3); });
+(function loop(){ if (front.duration && !dragging) setBar(front.currentTime / front.duration); tick(); requestAnimationFrame(loop); })();
+
+// menu
+// 选集：看过的集可回看；完成全部剧情后全部解锁、可任意切换
+let reached = 1, finished = false;
+try { reached = Math.max(1, +localStorage.getItem('mg2-reached') || 1); finished = localStorage.getItem('mg2-finished') === '1'; } catch(e){}
+const LOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function renderEps(){
+  $('epHint').textContent = finished ? '' : T('看完全部剧情后，可任意切换集数', 'Finish the story to unlock every episode');
+  $('epHint').hidden = finished;
+  $('epList').innerHTML = EPS.map((e, i) => { const open = finished || i <= reached; return `<button class="ep${open ? '' : ' locked'}" data-ep="${i}" ${open ? '' : 'disabled aria-disabled="true"'}><span><b>${i ? 'EP' + i : '▶'}</b>${esc(T(e.zh, e.en))}</span><small>${open ? esc(e.len) : LOCK}</small></button>`; }).join('');
+  $('epList').querySelectorAll('.ep:not(.locked)').forEach(b => b.onclick = () => { closeMenu(); hideCards(); closeChoice(); front.pause(); st.queue = []; st.after = null; go(EPS[+b.dataset.ep].node); });
+}
+function markReached(ep){ if (ep > reached){ reached = ep; try { localStorage.setItem('mg2-reached', String(ep)); } catch(e){} renderEps(); } }
+renderEps();
+function closeMenu(){ $('menu').hidden = true; $('menuBtn').setAttribute('aria-expanded', 'false'); }
+function openMenu(force){ const m = $('menu'); m.hidden = force ? false : !m.hidden; $('menuBtn').setAttribute('aria-expanded', String(!m.hidden)); }
+$('menuBtn').onclick = () => openMenu();
+document.addEventListener('pointerdown', e => { swallow = false; if (!$('speedMenu').hidden && !e.target.closest('#speedWrap')) { closeSpeed(); swallow = true; } if ($('menu').hidden || e.target.closest('#menu,#menuBtn')) return; closeMenu(); swallow = true; }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSpeed(); });
+document.addEventListener('click', e => { if (swallow && !e.target.closest('#menu,#menuBtn,#speedWrap')) { e.stopPropagation(); e.preventDefault(); swallow = false; } }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('menu').hidden) closeMenu(); });
+$('mBack').onclick = () => { $('menu').hidden = true; hideCards(); back2choice(); };
+$('mRestart').onclick = () => { $('menu').hidden = true; restart(true); };
+function toast(t){ const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 1800); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) wait.pause(); else if (waitTarget > 0) wait.play().catch(()=>{}); });
+})();
+</script>
