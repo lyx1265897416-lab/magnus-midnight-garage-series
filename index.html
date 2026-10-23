@@ -372,7 +372,7 @@ let liveRun = 0;
 async function liveRound(id, raw){
   const my = ++liveRun, t0 = Date.now(); let r = null, rid = null;
   $('sayBtn').disabled = true; closeChoice(); waitMusic(true); holdUntil = performance.now() + 1500;
-  const phase = () => !r ? '发送中…' : r.status === 'submitted' ? '导演层在写他的回话…' : r.status === 'error' ? '生成失败' : `两段同时生成中（${r.mode.replace('+', ' 秒 + ')} 秒）…`;
+  const phase = () => !r ? '发送中…' : r.status === 'submitted' ? '导演层在写他的回话…' : r.status === 'error' ? '生成失败' : `两段同时生成中（${r.mode.replace('+', ' 秒 + ')} 秒）· 已完成 ${(r.segs || []).filter(s => s.url).length}/2`;
   const hold = (label, cond) => new Promise(res => { lw.hidden = false; (function f(){ if (my !== liveRun) return; $('lwT').textContent = ((Date.now() - t0) / 1000).toFixed(1); $('lwS').textContent = label || phase(); if (cond()){ lw.hidden = true; res(); } else setTimeout(f, 100); })(); });  // 不用 rAF：窗口在后台时 rAF 会停
   try {
     const res = await fetch(LIVE.base + '/api/round', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({k: LIVE.k, point: id, input: raw, mode: LIVE.mode})});
@@ -390,20 +390,25 @@ async function liveRound(id, raw){
     v.onended = () => { showSub(null); res(); }; v.onerror = () => res();
     v.play().catch(() => { v.muted = true; v.play().catch(() => res()); });
   });
-  await hold(null, () => segUrl(0) || (r && (r.status === 'error' || r.status === 'preset')));
+  // 两段并发生成，都好了才开播：一次性连续放完，中间不停
+  const both = () => r && r.segs && r.segs.every(s => s.url || s.status === 'error');
+  await hold(null, () => both() || (r && (r.status === 'error' || r.status === 'preset')));
   if (my !== liveRun) return;
   if (r.status === 'preset'){ clearInterval(poll); lw.hidden = true; $('sayBtn').disabled = false; setChip(`<b>上一轮</b> · 导演层判断和预设选项 ${esc(r.preset)} 一致，按预设剧情继续`); choose(id, r.preset); return; }
   const view = {};
-  if (r.segs && r.segs[0].url){
+  if (r.segs && r.segs.every(s => s.url)){
+    r.segs.forEach((s, i) => { if (LV[i].getAttribute('src') !== s.url){ LV[i].src = s.url; LV[i].load(); } });
+    const t1 = Date.now();  // 两段都缓冲到能连续播放（最多等 6 秒），接缝处才不会再停
+    await hold('马上开始…', () => LV.every(v => v.readyState >= 4) || Date.now() - t1 > 6000);
+    view.buffer = (Date.now() - t1) / 1000;
     view.play_at = Date.now(); await play(0); view.seg1_end = Date.now();
-    await hold('下一段还在生成…', () => segUrl(1)); view.stall = (Date.now() - view.seg1_end) / 1000;
-    if (r.segs[1].url){ await play(1); }
+    await play(1); view.stall = (Date.now() - view.seg1_end) / 1000 - (LV[1].duration || 10);  // 接缝处实际多花的时间
   }
   clearInterval(poll); LV.forEach(x => x.classList.remove('on')); view.end_at = Date.now();
   fetch(`${LIVE.base}/api/round/${rid}/view`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign({k: LIVE.k}, view))}).catch(() => {});
-  const dir = r.director_at ? (r.director_at - r.at) / 1000 : null, gen1 = r.segs && r.segs[0].ready_at ? (r.segs[0].ready_at - r.director_at) / 1000 : null;
+  const dir = r.director_at ? (r.director_at - r.at) / 1000 : null, gen1 = r.segs && r.segs.every(s => s.ready_at) ? Math.max(...r.segs.map(s => s.ready_at - r.director_at)) / 1000 : null;
   setChip(r.status === 'error' && !view.play_at ? `<b>这一轮失败</b> · ${esc((r.segs || []).map(s => s.err).filter(Boolean)[0] || r.err || '')}` :
-    `<b>上一轮</b> · 发送到开播 ${((view.play_at - t0) / 1000).toFixed(1)}s（导演层 ${dir == null ? '—' : dir.toFixed(1)}s ＋ 生成 ${gen1 == null ? '—' : gen1.toFixed(1)}s）· 衔接卡顿 ${(view.stall || 0).toFixed(1)}s`);
+    `<b>上一轮</b> · 发送到开播 ${((view.play_at - t0) / 1000).toFixed(1)}s（导演层 ${dir == null ? '—' : dir.toFixed(1)}s ＋ 两段生成 ${gen1 == null ? '—' : gen1.toFixed(1)}s ＋ 缓冲 ${(view.buffer || 0).toFixed(1)}s）· 一次连续播完 ${(LV[0].duration + LV[1].duration || 15).toFixed(0)}s`);
   $('sayBtn').disabled = false;
   if (!view.play_at){ openChoice(id); return; }  // 生成失败才回到选择
   liveNext(id, raw);
