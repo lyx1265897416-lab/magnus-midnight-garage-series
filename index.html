@@ -112,6 +112,14 @@ body.choosing #bar,body.carding #bar,body.start #bar,body.ended #bar{display:non
 body.en-only .zh,body.en-only .only-zh{display:none!important}
 body:not(.en-only) .only-en{display:none!important}
 body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!important}
+/* 实时生成（带 ?live=…&k=… 打开时）：等待层、状态条 */
+#liveWait{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(5,6,8,.45);text-align:center;padding:24px;pointer-events:none}
+#liveWait .ring{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.22);border-top-color:var(--gold);animation:lw 1s linear infinite}
+@keyframes lw{to{transform:rotate(360deg)}}
+#lwT{font-size:30px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+#lwS{font-size:12.5px;color:var(--concrete);font-family:var(--zh)}
+#liveChip{position:absolute;z-index:5;left:16px;top:calc(56px + env(safe-area-inset-top,0px));max-width:calc(100% - 32px);font-size:11px;line-height:1.5;color:var(--concrete);background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:10px;padding:5px 10px;font-family:var(--zh);font-variant-numeric:tabular-nums}
+#liveChip b{color:var(--gold);font-weight:500}
 #speedWrap{position:relative;flex:none}
 #speedBtn{height:30px;min-width:46px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.35);color:var(--concrete);font-size:12px;font-variant-numeric:tabular-nums;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #speedBtn:focus-visible,#speedMenu button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -124,6 +132,8 @@ body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!
 <div id="stage">
   <video class="v" id="va" playsinline webkit-playsinline preload="auto"></video>
   <video class="v" id="vb" playsinline webkit-playsinline preload="auto"></video>
+  <video class="v" id="vl1" playsinline webkit-playsinline preload="auto"></video>
+  <video class="v" id="vl2" playsinline webkit-playsinline preload="auto"></video>
   <div class="shade"></div>
   <div id="paused" hidden><div><svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M8 5.5v13l10.5-6.5z"/></svg></div></div>
   <header id="top">
@@ -189,6 +199,8 @@ body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!
     <button class="cta" id="endRestart"><span class="only-zh">从头再看</span><span class="only-en">Watch again</span></button>
   </section>
   <div id="toast" hidden></div>
+  <div id="liveChip" hidden></div>
+  <div id="liveWait" hidden><div class="ring"></div><div id="lwT">0.0</div><div id="lwS"></div></div>
 </div>
 
 <script src="data.js" charset="utf-8"></script>
@@ -310,6 +322,7 @@ $('say').addEventListener('submit', e => {
   const raw = $('sayIn').value.trim(); const id = st.node, p = POINTS[id]; if (!raw || !p) return;
   $('sayIn').value = ''; const t = norm(raw);
   showSub(EN ? {en: raw, zh: '', k: 'her'} : {en: '', zh: raw, k: 'her'});
+  if (LIVE && LIVE.ok){ liveRound(id, raw); return; }
   let r = p.replies.find(x => hit(t, x.kw)), sug = null;
   for (const k of ['A', 'B']) if (hit(t, p.suggest[k])) { sug = k; break; }
   if (!r && !sug){ const i = (fb[id] = (fb[id] || 0)) % p.fallback.length; fb[id]++; r = p.fallback[i]; }
@@ -321,6 +334,52 @@ $('say').addEventListener('submit', e => {
     $('sayBtn').disabled = false;
   }, 420);
 });
+
+// live：自由输入交给本机中转，实时调用 Vivix（5 秒 + 10 秒两段同时生成），哪段好了先播，第 2 段没好就停在第 1 段最后一帧等
+const LQ = new URLSearchParams(location.search);
+const LIVE = LQ.get('live') && LQ.get('k') ? {base: 'https://' + LQ.get('live').replace(/^https?:\/\//, '').replace(/\/$/, ''), k: LQ.get('k'), mode: LQ.get('mode') || '5+10', ok: false} : null;
+const chip = $('liveChip'), lw = $('liveWait'), LV = [$('vl1'), $('vl2')];
+const setChip = h => { chip.innerHTML = h; chip.hidden = !h; };
+if (LIVE) fetch(`${LIVE.base}/api/ping?k=${encodeURIComponent(LIVE.k)}`).then(r => r.json()).then(j => {
+  LIVE.ok = !!j.ok; setChip(LIVE.ok ? `<b>实时生成已连接</b> · ${esc(j.model)} · ${esc(LIVE.mode)} 并发 · 在选择点用自己的话对他说` : '实时生成口令不对，自由输入用预设回复');
+}).catch(() => setChip('实时生成没连上（本机服务或隧道没开），自由输入用预设回复'));
+let liveRun = 0;
+async function liveRound(id, raw){
+  const my = ++liveRun, t0 = Date.now(); let r = null, rid = null;
+  $('sayBtn').disabled = true; closeChoice(); waitMusic(true); holdUntil = performance.now() + 1500;
+  const phase = () => !r ? '发送中…' : r.status === 'submitted' ? '导演层在写他的回话…' : r.status === 'error' ? '生成失败' : `两段同时生成中（${r.mode.replace('+', ' 秒 + ')} 秒）…`;
+  const hold = (label, cond) => new Promise(res => { lw.hidden = false; (function f(){ if (my !== liveRun) return; $('lwT').textContent = ((Date.now() - t0) / 1000).toFixed(1); $('lwS').textContent = label || phase(); if (cond()){ lw.hidden = true; res(); } else requestAnimationFrame(f); })(); });
+  try {
+    const res = await fetch(LIVE.base + '/api/round', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({k: LIVE.k, point: id, input: raw, mode: LIVE.mode})});
+    const j = await res.json(); if (!res.ok) throw new Error(j.err || res.status); rid = j.id;
+  } catch (e){ lw.hidden = true; toast('实时生成不可用：' + e.message); $('sayBtn').disabled = false; openChoice(id); return; }
+  const poll = setInterval(async () => {
+    try { const res = await fetch(`${LIVE.base}/api/round/${rid}?k=${encodeURIComponent(LIVE.k)}`); if (res.ok) r = await res.json(); } catch (e){}
+    if (r && r.segs) r.segs.forEach((s, i) => { if (s.url && LV[i].getAttribute('src') !== s.url){ LV[i].src = s.url; LV[i].load(); } });  // 一到就预载
+  }, 500);
+  const segUrl = i => r && r.segs && r.segs[i] && (r.segs[i].url || r.segs[i].status === 'error');
+  const play = i => new Promise(res => {
+    const v = LV[i], L = (r.lines['seg' + (i + 1)] || []).filter(Boolean), Z = ((r.zh || {})['seg' + (i + 1)] || []).filter(Boolean);
+    LV.forEach(x => x.classList.toggle('on', x === v)); waitMusic(false); v.currentTime = 0; v.playbackRate = 1; v.muted = false;
+    v.ontimeupdate = () => { if (my !== liveRun || !L.length) return; const k = Math.min(L.length - 1, Math.floor(v.currentTime / (v.duration || r.segs[i].seconds) * L.length)); showSub({en: L[k], zh: Z[k] || '', who: 'Magnus'}); };
+    v.onended = () => { showSub(null); res(); }; v.onerror = () => res();
+    v.play().catch(() => { v.muted = true; v.play().catch(() => res()); });
+  });
+  await hold(null, () => segUrl(0) || (r && r.status === 'error'));
+  if (my !== liveRun) return;
+  const view = {};
+  if (r.segs && r.segs[0].url){
+    view.play_at = Date.now(); await play(0); view.seg1_end = Date.now();
+    await hold('下一段还在生成…', () => segUrl(1)); view.stall = (Date.now() - view.seg1_end) / 1000;
+    if (r.segs[1].url){ await play(1); }
+  }
+  clearInterval(poll); LV.forEach(x => x.classList.remove('on')); view.end_at = Date.now();
+  fetch(`${LIVE.base}/api/round/${rid}/view`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign({k: LIVE.k}, view))}).catch(() => {});
+  const dir = r.director_at ? (r.director_at - r.at) / 1000 : null, gen1 = r.segs && r.segs[0].ready_at ? (r.segs[0].ready_at - r.director_at) / 1000 : null;
+  setChip(r.status === 'error' && !view.play_at ? `<b>这一轮失败</b> · ${esc((r.segs || []).map(s => s.err).filter(Boolean)[0] || r.err || '')}` :
+    `<b>上一轮</b> · 发送到开播 ${((view.play_at - t0) / 1000).toFixed(1)}s（导演层 ${dir == null ? '—' : dir.toFixed(1)}s ＋ 生成 ${gen1 == null ? '—' : gen1.toFixed(1)}s）· 衔接卡顿 ${(view.stall || 0).toFixed(1)}s`);
+  $('sayBtn').disabled = false; openChoice(id);
+}
 
 // end
 function showEnd(){
