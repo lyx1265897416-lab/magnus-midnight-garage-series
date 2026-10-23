@@ -339,11 +339,8 @@ $('say').addEventListener('submit', e => {
   const raw = $('sayIn').value.trim(); const id = st.node, p = POINTS[id]; if (!raw || !p) return;
   $('sayIn').value = ''; const t = norm(raw);
   showSub(EN ? {en: raw, zh: '', k: 'her'} : {en: '', zh: raw, k: 'her'});
-  if (LIVE && LIVE.ok){
-    // 只有短句、且命中两个字以上的关键词才直接走预设（"好""行"这类单字太宽，长句交给导演层判断）
-    const t0 = norm(raw), strong = kws => kws.filter(k => !/[\u4e00-\u9fff]/.test(k) || k.length >= 2);
-    const sug0 = raw.length <= 12 ? ['A', 'B'].find(k => hit(t0, strong(p.suggest[k]))) : null;
-    if (sug0){ $('sayIn').value = ''; choose(id, sug0); return; }  // 和预设选项差不多：按预设分支演
+  if (LIVE){  // 带实时口令打开就每次都走中转；连不上会明确提示，不再悄悄退回预设回复
+    // 实时模式不在页面上按关键词分流（常用词太容易误命中）：一律交给导演层按意思判断走预设分支还是实时生成
     liveRound(id, raw); return;
   }
   let r = p.replies.find(x => hit(t, x.kw)), sug = null;
@@ -377,7 +374,8 @@ async function liveRound(id, raw){
   try {
     const res = await fetch(LIVE.base + '/api/round', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({k: LIVE.k, point: id, input: raw, mode: LIVE.mode})});
     const j = await res.json(); if (!res.ok) throw new Error(j.err || res.status); rid = j.id;
-  } catch (e){ lw.hidden = true; toast('实时生成不可用：' + e.message); $('sayBtn').disabled = false; openChoice(id); return; }
+  } catch (e){ lw.hidden = true; setChip('<b>实时生成没连上</b> · ' + esc(e.message) + ' · 请确认本机中转在运行后再发一次'); toast('实时生成不可用'); $('sayBtn').disabled = false; openChoice(id); return; }
+  LIVE.ok = true;
   const poll = setInterval(async () => {
     try { const res = await fetch(`${LIVE.base}/api/round/${rid}?k=${encodeURIComponent(LIVE.k)}`); if (res.ok) r = await res.json(); } catch (e){}
     if (r && r.segs) r.segs.forEach((s, i) => { if (s.url && LV[i].getAttribute('src') !== s.url){ LV[i].src = s.url; LV[i].load(); } });  // 一到就预载
@@ -394,7 +392,7 @@ async function liveRound(id, raw){
   const both = () => r && r.segs && r.segs.every(s => s.url || s.status === 'error');
   await hold(null, () => both() || (r && (r.status === 'error' || r.status === 'preset')));
   if (my !== liveRun) return;
-  if (r.status === 'preset'){ clearInterval(poll); lw.hidden = true; $('sayBtn').disabled = false; setChip(`<b>上一轮</b> · 导演层判断和预设选项 ${esc(r.preset)} 一致，按预设剧情继续`); choose(id, r.preset); return; }
+  if (r.status === 'preset'){ clearInterval(poll); lw.hidden = true; $('sayBtn').disabled = false; setChip(`<b>上一轮</b> · 导演层判断你这句和预设选项 ${esc(r.preset)} 意思一致，按预设剧情继续（没有调用生成）`); choose(id, r.preset); return; }
   const view = {};
   if (r.segs && r.segs.every(s => s.url)){
     r.segs.forEach((s, i) => { if (LV[i].getAttribute('src') !== s.url){ LV[i].src = s.url; LV[i].load(); } });
