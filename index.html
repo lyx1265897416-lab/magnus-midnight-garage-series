@@ -153,8 +153,8 @@ body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!
   <div id="subs" aria-live="polite"></div>
   <div id="bar">
     <button class="icon" id="playBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="#eee" id="playIco"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
-    <div id="track" role="slider" tabindex="0" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="fill"></b><s id="knob"></s></i></div>
     <div id="time" aria-hidden="true">0:00 / 0:00</div>
+    <div id="track" role="slider" tabindex="0" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="fill"></b><s id="knob"></s></i></div>
     <div id="chap"></div>
     <div id="speedWrap"><button id="speedBtn" aria-label="Playback speed" aria-expanded="false">1.0x</button><div id="speedMenu" hidden></div></div>
   </div>
@@ -337,12 +337,14 @@ $('say').addEventListener('submit', e => {
 
 // live：自由输入交给本机中转，实时调用 Vivix（5 秒 + 10 秒两段同时生成），哪段好了先播，第 2 段没好就停在第 1 段最后一帧等
 const LQ = new URLSearchParams(location.search);
-const LIVE = LQ.get('live') && LQ.get('k') ? {base: 'https://' + LQ.get('live').replace(/^https?:\/\//, '').replace(/\/$/, ''), k: LQ.get('k'), mode: LQ.get('mode') || '5+10', ok: false} : null;
+// live=127.0.0.1:8899 这类本机地址走 http（Chrome 把本机回环当作安全来源），其它走 https
+const LH = (LQ.get('live') || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+const LIVE = LH && LQ.get('k') ? {base: (/^(127\.0\.0\.1|localhost)(:|$)/.test(LH) ? 'http://' : 'https://') + LH, k: LQ.get('k'), mode: LQ.get('mode') || '5+10', ok: false} : null;
 const chip = $('liveChip'), lw = $('liveWait'), LV = [$('vl1'), $('vl2')];
 const setChip = h => { chip.innerHTML = h; chip.hidden = !h; };
 if (LIVE) fetch(`${LIVE.base}/api/ping?k=${encodeURIComponent(LIVE.k)}`).then(r => r.json()).then(j => {
   LIVE.ok = !!j.ok; setChip(LIVE.ok ? `<b>实时生成已连接</b> · ${esc(j.model)} · ${esc(LIVE.mode)} 并发 · 在选择点用自己的话对他说` : '实时生成口令不对，自由输入用预设回复');
-}).catch(() => setChip('实时生成没连上（本机服务或隧道没开），自由输入用预设回复'));
+}).catch(() => setChip('实时生成没连上（本机中转没开，或 Chrome 没允许访问本机），自由输入用预设回复'));
 let liveRun = 0;
 async function liveRound(id, raw){
   const my = ++liveRun, t0 = Date.now(); let r = null, rid = null;
