@@ -42,7 +42,7 @@ body.choosing .shade{background:linear-gradient(to bottom,rgba(0,0,0,.55),transp
 #card .zh{font-family:var(--zh);font-size:19px;line-height:1.55;color:#fff;letter-spacing:.06em;text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:pre-line}
 #card .en{font-family:var(--display);font-size:14px;letter-spacing:.06em;color:#e6dcc5;text-shadow:0 2px 6px rgba(0,0,0,.9)}
 /* progress */
-#bar{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:12px}
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px}
 #track{flex:1;height:34px;display:flex;align-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
 #track i{display:block;height:2px;width:100%;background:rgba(255,255,255,.22);position:relative;border-radius:2px}
 #track i b{position:absolute;left:0;top:0;bottom:0;background:var(--gold);width:0;border-radius:2px}
@@ -50,6 +50,8 @@ body.choosing .shade{background:linear-gradient(to bottom,rgba(0,0,0,.55),transp
 #track.drag i{height:4px}#track.drag i s{transform:scale(1.35)}
 #track:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
 #chap{font-size:12px;color:var(--mute);white-space:nowrap;font-family:var(--zh)}
+/* 进度时长：各项目统一为「已播 / 本集总长」，12px 等宽数字，和集数同色 */
+#time{font-size:12px;color:var(--mute);white-space:nowrap;font-family:var(--body);font-variant-numeric:tabular-nums;letter-spacing:.02em}
 body.choosing #bar,body.carding #bar,body.start #bar,body.ended #bar{display:none}
 #paused{position:absolute;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none}
 #paused div{width:66px;height:66px;border-radius:50%;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center}
@@ -141,7 +143,8 @@ body.sub-en #subs .zh,body.sub-en #card .zh,body.sub-en #sheet .zh{display:none!
   <div id="subs" aria-live="polite"></div>
   <div id="bar">
     <button class="icon" id="playBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="#eee" id="playIco"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
-    <div id="track" role="slider" tabindex="0" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="fill"></b><s id="knob"></s></i></div>
+    <div id="track" role="slider" tabindex="0" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="fill"></b><s id="knob"></s></i></div>
+    <div id="time" aria-hidden="true">0:00 / 0:00</div>
     <div id="chap"></div>
     <div id="speedWrap"><button id="speedBtn" aria-label="Playback speed" aria-expanded="false">1.0x</button><div id="speedMenu" hidden></div></div>
   </div>
@@ -196,7 +199,7 @@ const {CLIPS, EPS, NODES, POINTS} = window.DRAMA;
 const va = $('va'), vb = $('vb'); let front = va, back = vb;
 const wait = new Audio('audio/wait.mp3'); wait.loop = true; wait.volume = 0;
 const voice = new Audio();
-let st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0};
+let st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0, entry:null};
 // 字幕跟随系统语言：英文系统只显示英文，中文系统中英双语
 const HL = location.hash.slice(1);  // 预览用：链接末尾加 #zh 或 #en 可强制语言
 const EN = HL === 'en' ? true : HL === 'zh' ? false : !/^zh/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
@@ -241,11 +244,11 @@ const src = id => `media/${id}.mp4`;
 function swap(){ const f = front; front = back; back = f; front.classList.add('on'); back.classList.remove('on'); }
 const warmed = {}; const keep = [];
 function warm(ids){ ids.forEach(id => { if (!id || warmed[id] || !CLIPS[id]) return; warmed[id] = 1; const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.src = src(id); v.load(); keep.push(v); if (keep.length > 6) keep.shift(); }); }
-function playClip(id){
+function playClip(id, offset = 0){
   st.clip = id; lastKey = ''; showSub(null); showCard(null);
   back.src = src(id); back.currentTime = 0; back.muted = false; back.defaultPlaybackRate = rate; back.playbackRate = rate;
-  const go = () => back.play().then(() => { swap(); front.onended = onEnd; setTimeout(() => back.pause(), 250); })
-    .catch(() => { swap(); front.onended = onEnd; $('paused').hidden = false; toast(T('点一下画面继续播放', 'Tap to keep playing')); });
+  const go = () => { if (offset) back.currentTime = offset; return back.play().then(() => { swap(); front.onended = onEnd; setTimeout(() => back.pause(), 250); })
+    .catch(() => { swap(); front.onended = onEnd; $('paused').hidden = false; toast(T('点一下画面继续播放', 'Tap to keep playing')); }); };
   if (back.readyState >= 2) go(); else back.addEventListener('loadeddata', go, {once:true});
   $('chap').textContent = st.ep ? `EP${st.ep}` : T('预告', 'Trailer');
   warm(CLIPS[id].next || []);
@@ -261,7 +264,7 @@ function go(id){
   if (n.type === 'end') return showEnd();
 }
 function epIntro(n, id, prevDone){
-  const prev = st.ep; st.ep = n.ep; markReached(n.ep); $('epName').textContent = EN ? (n.ep ? `Episode ${n.ep}` : 'Trailer') : EPS[n.ep].label;
+  const prev = st.ep; st.ep = n.ep; st.entry = {seq: n.seq, next: n.next}; markReached(n.ep); $('epName').textContent = EN ? (n.ep ? `Episode ${n.ep}` : 'Trailer') : EPS[n.ep].label;
   if (n.ep === 0) return runSeq(n.seq, n.next);
   mode('carding'); showSub(null); showCard(null); front.pause();
   $('epDone').textContent = prev && prev < n.ep ? T(`第 ${prev} 集 · 完`, `End of Episode ${prev}`) : '';
@@ -275,7 +278,7 @@ function epIntro(n, id, prevDone){
 // choices
 function openChoice(id){
   const p = POINTS[id];
-  st.checkpoint = {node:id, path: st.path.slice(), ep: st.ep};
+  st.checkpoint = {node:id, path: st.path.slice(), ep: st.ep, entry: st.entry};
   mode('choosing'); waitMusic(true); showCard(null);
   $('stage').style.backgroundImage = `url(media/${id}.jpg)`;
   showSub({en: p.line[0], zh: p.line[1], who: 'Magnus'});
@@ -329,8 +332,8 @@ function showEnd(){
 $('endRestart').onclick = () => { $('endCard').hidden = true; restart(true); };
 $('endBack').onclick = () => { $('endCard').hidden = true; back2choice(); };
 $('endEps').onclick = () => { $('endCard').hidden = true; openMenu(true); };
-function back2choice(){ const cp = st.checkpoint; if (!cp) return restart(true); st.path = cp.path.slice(); st.queue = []; st.after = null; st.ep = cp.ep; front.pause(); go(cp.node); }
-function restart(withTrailer){ st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0}; closeChoice(); hideCards(); go(withTrailer ? 'ep0' : 'ep1'); }
+function back2choice(){ const cp = st.checkpoint; if (!cp) return restart(true); st.path = cp.path.slice(); st.queue = []; st.after = null; st.ep = cp.ep; st.entry = cp.entry; front.pause(); go(cp.node); }
+function restart(withTrailer){ st = {node:null, queue:[], clip:null, path:[], checkpoint:null, after:null, ep:0, entry:null}; closeChoice(); hideCards(); go(withTrailer ? 'ep0' : 'ep1'); }
 function hideCards(){ ['startCard','epCard','endCard'].forEach(x => $(x).hidden = true); }
 
 // start
@@ -357,13 +360,34 @@ $('speedMenu').querySelectorAll('button').forEach(b => b.onclick = e => { e.stop
 applyRate();
 const track = $('track');
 function setBar(p){ const pc = Math.max(0, Math.min(100, p * 100)); $('fill').style.width = pc + '%'; $('knob').style.left = pc + '%'; track.setAttribute('aria-valuenow', Math.round(pc)); }
-function seekTo(clientX){ const r = track.querySelector('i').getBoundingClientRect(); const p = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); setBar(p); if (front.duration) front.currentTime = Math.min(front.duration - 0.05, p * front.duration); lastKey = ''; }
-track.addEventListener('pointerdown', e => { if (!front.duration) return; dragging = true; track.classList.add('drag'); track.setPointerCapture(e.pointerId); seekTo(e.clientX); e.preventDefault(); });
-track.addEventListener('pointermove', e => { if (dragging) seekTo(e.clientX); });
-const endDrag = () => { if (!dragging) return; dragging = false; track.classList.remove('drag'); };
-track.addEventListener('pointerup', endDrag); track.addEventListener('pointercancel', endDrag);
-track.addEventListener('keydown', e => { if (!front.duration) return; if (e.key === 'ArrowRight') front.currentTime = Math.min(front.duration - 0.05, front.currentTime + 3); if (e.key === 'ArrowLeft') front.currentTime = Math.max(0, front.currentTime - 3); });
-(function loop(){ if (front.duration && !dragging) setBar(front.currentTime / front.duration); tick(); requestAnimationFrame(loop); })();
+// 本集进度：按已做的选择串起本集镜头，还没做的选择按第一个选项预估。镜头时长在运行时读取。
+const DUR = {};
+function probe(ids){ ids.forEach(id => { if (DUR[id] || probe[id]) return; probe[id] = 1; const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.onloadedmetadata = () => { DUR[id] = v.duration; v.removeAttribute('src'); v.load(); }; v.src = src(id); }); }
+function epPath(preview){ const out = []; let seg = st.entry; for (let g = 0; seg && g < 30; g++){ seg.seq.forEach((id, i) => out.push({id, i, seg})); const n = NODES[seg.next]; if (!n || n.type !== 'choice') break; const hit = st.path.filter(p => p.id === seg.next).pop(), k = hit ? hit.k : preview ? 'A' : null; if (!k || n[k].ep) break; seg = n[k]; } return out; }
+const onClip = () => front.getAttribute('src') === src(st.clip);  // 换镜头时新片还在加载，front 仍是上一段
+const sum = list => list.reduce((a, p) => a + (DUR[p.id] || 0), 0);
+function epClock(){ const all = epPath(true); probe(all.map(p => p.id)); const i = all.findIndex(p => p.id === st.clip); return {elapsed: (i < 0 ? 0 : sum(all.slice(0, i))) + (onClip() ? front.currentTime : 0), total: sum(all), known: all.length > 0 && all.every(p => DUR[p.id])}; }
+const clockText = x => { const v = Math.max(0, Math.floor(x || 0)); return Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0'); };
+function showTime(elapsed, c){ const t = clockText(c.known ? Math.min(elapsed, c.total) : elapsed) + ' / ' + (c.known ? clockText(c.total) : '-:--'); if ($('time').textContent !== t) $('time').textContent = t; }
+const fracAt = x => { const r = track.querySelector('i').getBoundingClientRect(); return Math.max(0, Math.min(1, (x - r.left) / r.width)); };
+function seekEpisode(f){
+  const c = epClock(); if (!c.known) return;
+  const all = epPath(true), ok = epPath(false), limit = sum(ok), want = f * c.total;
+  if (want > limit - .1 && ok.length < all.length) toast(T('先完成这里的选择，再继续向前', 'Make this choice to continue'));
+  const t = Math.max(0, Math.min(want, limit - .15)); let acc = 0, sel = ok[0];
+  for (const p of ok){ sel = p; if (t < acc + DUR[p.id]) break; acc += DUR[p.id]; }
+  const off = Math.max(0, t - acc); lastKey = '';
+  if (sel.id === st.clip){ front.currentTime = off; if (front.paused && $('paused').hidden) front.play().catch(() => {}); return; }
+  // 跳回已做过的选择之前：之后的选择要重新做
+  const later = new Set(); let on = false; for (const p of ok){ if (p.seg === sel.seg) on = true; if (on) later.add(p.seg.next); }
+  st.path = st.path.filter(p => !later.has(p.id)); st.queue = sel.seg.seq.slice(sel.i + 1); st.after = sel.seg.next; $('paused').hidden = true; playClip(sel.id, off);
+}
+track.addEventListener('pointerdown', e => { if (!front.duration) return; dragging = true; track.classList.add('drag'); track.setPointerCapture(e.pointerId); const f = fracAt(e.clientX), c = epClock(); setBar(f); showTime(f * c.total, c); e.preventDefault(); });
+track.addEventListener('pointermove', e => { if (!dragging) return; const f = fracAt(e.clientX), c = epClock(); setBar(f); showTime(f * c.total, c); });
+track.addEventListener('pointerup', e => { if (!dragging) return; dragging = false; track.classList.remove('drag'); seekEpisode(fracAt(e.clientX)); });
+track.addEventListener('pointercancel', () => { dragging = false; track.classList.remove('drag'); });
+track.addEventListener('keydown', e => { if (!front.duration || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); const c = epClock(); if (c.total) seekEpisode((c.elapsed + (e.key === 'ArrowRight' ? 3 : -3)) / c.total); });
+(function loop(){ if (front.duration && st.clip){ if (onClip()) DUR[st.clip] = DUR[st.clip] || front.duration; if (!dragging){ const c = epClock(); setBar(c.known && c.total ? c.elapsed / c.total : front.currentTime / front.duration); showTime(c.elapsed, c); } } tick(); requestAnimationFrame(loop); })();
 
 // menu
 // 选集：看过的集可回看；完成全部剧情后全部解锁、可任意切换
